@@ -59,18 +59,20 @@ def googLeNet(img_shape):
     return Model(input_, output)
 
 googlenet = googLeNet(img_shape)
-
-# googlenet.summary()
+googlenet.summary()
 print("전체 파라미터 수 : {}".format(sum([arr.flatten().shape[0] for arr in googlenet.get_weights()])))
 
 with Back.tf.device('/gpu:0'):
     googlenet.compile(optimizer=SGD(lr=0.01,decay=1e-6, momentum=0.9), 
     loss='categorical_crossentropy', metrics=["accuracy"])
-#googlenet.summary()
+
 path = 'D:\PHD08\phd08-conversion-master\phd08_npy_results\phd08_'
 def next_load_data(path, train, index):
     #DataSet
-    a = np.load(path+'data_'+str(index)+'.npy')
+    try:
+        a = np.load(path+'data_'+str(index)+'.npy')
+    except:
+        return -1
     a = a.reshape(2187,56,56,1).astype('float32') / 255.0
     b = np.load(path+'labels_'+str(index)+'.npy')
     x_train = a[0:train,:,:,:]
@@ -79,27 +81,97 @@ def next_load_data(path, train, index):
     y_test = b[train:,:]
     return np.array(x_train), np.array(y_train), np.array(x_test),np.array(y_test)
 
-x_train, y_train, x_test, y_test = next_load_data(path,1458, 165)
+googlenet.load_weights('save/save_2019-5-29.h5')
 
-#arr = (340,469,656,859,1004,1246)
-#긺, 넬, 덤, 랒, 묶, 뷕, 슛
-for i in range(2,101):
-#for i in arr:
-    x_train0, y_train0, x_test0, y_test0 = next_load_data(path,1458, i)
-    x_train = np.vstack((x_train,x_train0))
-    y_train = np.vstack((y_train,y_train0))
-    x_test = np.vstack((x_test,x_test0))
-    y_test = np.vstack((y_test,y_test0))
-    print('진행 : '+str(i))
+######################## train ###########################
 
-#x_train = np.vstack((x_train,x_train))
-#y_train = np.vstack((y_train,y_train))
-#x_train = np.vstack((x_train,x_train))
-#y_train = np.vstack((y_train,y_train))
+# with Back.tf.device('/gpu:0'):
+#     for i in range(1):
+#         state = open("state.txt","r")
+#         r = int(state.readline())
+#         x_train, y_train, x_test, y_test = next_load_data(path,1458, r)
+#         print('Data_Loading...'+str(r))
+#         r+=1
+
+#         for i in range(r,99+r):
+#             try:
+#                 x_train0, y_train0, x_test0, y_test0 = next_load_data(path,1458, i)
+#             except:
+#                 break
+            
+#             x_train = np.vstack((x_train,x_train0))
+#             y_train = np.vstack((y_train,y_train0))
+#             x_test = np.vstack((x_test,x_test0))
+#             y_test = np.vstack((y_test,y_test0))
+#             print('Data_Loading...'+str(i))
+
+#         state.close()
+
+#         state = open("state.txt","w+")
+
+#         training = googlenet.fit(x_train, y_train, epochs=2, batch_size=56, shuffle=True)
+#         now = datetime.now()
+#         temp = ('%s-%s-%s'%(now.year, now.month, now.day))
+#         googlenet.save_weights('save/save_'+temp+'.h5')
+
+#         state.write(str(r+99))
+#         state.close()
+
+######################## test ###########################
+
+# r = 100
+# t = 20
+
+# x_train, y_train, x_test, y_test = next_load_data(path,1458, r)
+# print('Data_Loading...'+str(r))
+# r+=1
+
+# for i in range(r,t+r):
+#     try:
+#         x_train0, y_train0, x_test0, y_test0 = next_load_data(path,1458, i)
+#     except:
+#         break
+#     x_train = np.vstack((x_train,x_train0))
+#     y_train = np.vstack((y_train,y_train0))
+#     x_test = np.vstack((x_test,x_test0))
+#     y_test = np.vstack((y_test,y_test0))
+#     print('Data_Loading...'+str(i))
+
+# with Back.tf.device('/gpu:0'):
+#     evaluate = googlenet.evaluate(x_test, y_test, batch_size=56)
+#     print(evaluate)
+
+######################## predict ###########################
+
+import cv2
+x = cv2.imread('test_images/5.png', cv2.IMREAD_GRAYSCALE)
+x = x/255
+for i in range(len(x)):
+    for j in range(len(x[0])):
+        if (x[i][j]==0):
+            x[i][j] = 1
+        else:
+            x[i][j] = 0
+
+#cv2.imshow('gray',x)
+x = x.reshape(1,56,56,1)
+
 
 with Back.tf.device('/gpu:0'):
-    training = googlenet.fit(x_train, y_train,validation_data=(x_test,y_test),epochs=2, batch_size=56)
-    now = datetime.now()
-    temp = ('%s-%s-%s'%(now.year, now.month, now.day))
-    googlenet.save('save/save_'+temp+'.h5')
-    
+    x_predict = googlenet.predict(x, batch_size=1)
+    print(x_predict.shape)
+
+x_predict = x_predict[0]
+
+m = 0
+for i in range(len(x_predict)):
+    if(x_predict[i]>x_predict[m]): 
+        m = i
+print(m)
+x_train, y_train, x_test, y_test = next_load_data(path, 1458, m+1)
+
+result_image = x_test[0].reshape(56,56)
+cv2.imshow('gray',result_image)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
